@@ -9,8 +9,8 @@ class GitWrapper():
     def load_ssh_key(repo_config):
         """Set the GIT_SSH_COMMAND environment variable to use the specified ssh key"""
         import logging
+
         from .process import ProcessWrapper
-        import os
 
         logger = logging.getLogger()
         logger.info("Loading SSH key %s" % repo_config['ssh_key'])
@@ -38,9 +38,10 @@ class GitWrapper():
     def init(repo_config):
         """Init remote url of the repo from the git server"""
         import logging
-        from .process import ProcessWrapper
         import os
         import platform
+
+        from .process import ProcessWrapper
 
         logger = logging.getLogger()
         logger.info("Initializing repository %s" % repo_config['path'])
@@ -54,13 +55,14 @@ class GitWrapper():
         else:
             commands.append('unset GIT_DIR')
 
+        if "ssh_key" in repo_config:
+            commands.append('unset GIT_SSH_COMMAND')
+            commands.append('export GIT_SSH_COMMAND="ssh -i ' + repo_config['ssh_key'] + ' -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"')
+
         commands.append('git remote set-url ' + repo_config['remote'] + " " + repo_config['url'])
         commands.append('git fetch ' + repo_config['remote'])
         commands.append('git checkout -f -B ' + repo_config['branch'] + ' -t ' + repo_config['remote'] + '/' + repo_config['branch'])
         commands.append('git submodule update --init --recursive')
-
-        if "ssh_key" in repo_config:
-            GitWrapper.load_ssh_key(repo_config)
 
         # All commands need to success
         for command in commands:
@@ -81,9 +83,10 @@ class GitWrapper():
     def pull(repo_config):
         """Pulls the latest version of the repo from the git server"""
         import logging
-        from .process import ProcessWrapper
         import os
         import platform
+
+        from .process import ProcessWrapper
 
         logger = logging.getLogger()
         logger.info("Updating repository %s" % repo_config['path'])
@@ -102,6 +105,10 @@ class GitWrapper():
         else:
             commands.append('unset GIT_DIR')
 
+        if "ssh_key" in repo_config:
+            commands.append('unset GIT_SSH_COMMAND')
+            commands.append('export GIT_SSH_COMMAND="ssh -i ' + repo_config['ssh_key'] + ' -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"')
+
         if "prepull" in repo_config:
             commands.append(repo_config['prepull'])
 
@@ -111,9 +118,6 @@ class GitWrapper():
 
         if "postpull" in repo_config:
             commands.append(repo_config['postpull'])
-
-        if "ssh_key" in repo_config:
-            GitWrapper.load_ssh_key(repo_config)
 
         # All commands need to success
         for command in commands:
@@ -134,9 +138,9 @@ class GitWrapper():
     def clone(repo_config):
         """Clones the latest version of the repo from the git server"""
         import logging
-        from .process import ProcessWrapper
         import os
-        import platform
+
+        from .process import ProcessWrapper
 
         logger = logging.getLogger()
         logger.info("Cloning repository %s" % repo_config['path'])
@@ -145,12 +149,14 @@ class GitWrapper():
         if 'path' not in repo_config:
             logger.info('No local repository path configured, no clone will occure')
             return 0
-        
-        if 'ssh_key' in repo_config:
-            GitWrapper.load_ssh_key(repo_config)
 
         commands = []
         commands.append('unset GIT_DIR')
+
+        if 'ssh_key' in repo_config:
+            commands.append('unset GIT_SSH_COMMAND')
+            commands.append('export GIT_SSH_COMMAND="ssh -i ' + repo_config['ssh_key'] + ' -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"')
+
         commands.append('git clone --recursive ' + repo_config['url'] + ' -b ' + repo_config['branch'] + ' ' + repo_config['path'])
 
         # All commands need to success
@@ -172,14 +178,15 @@ class GitWrapper():
     @staticmethod
     def deploy(repo_config):
         """Executes any supplied post-pull deploy command"""
-        from .process import ProcessWrapper
         import logging
+
+        from .process import ProcessWrapper
         logger = logging.getLogger()
 
         if 'path' in repo_config:
             path = repo_config['path']
 
-        if not 'deploy_commands' in repo_config or len(repo_config['deploy_commands']) == 0:
+        if 'deploy_commands' not in repo_config or len(repo_config['deploy_commands']) == 0:
             logger.info('No deploy commands configured')
             return []
 
