@@ -47,6 +47,7 @@ class GitWrapper():
         logger.info("Initializing repository %s" % repo_config['path'])
 
         commands = []
+        env = os.environ.copy()
 
         # On Windows, bash command needs to be run using bash.exe. This assumes bash.exe
         # (typically installed under C:\Program Files\Git\bin) is in the system PATH.
@@ -55,18 +56,17 @@ class GitWrapper():
         else:
             commands.append('unset GIT_DIR')
 
-        if "ssh_key" in repo_config:
-            commands.append('unset GIT_SSH_COMMAND')
-            commands.append('export GIT_SSH_COMMAND="ssh -i ' + repo_config['ssh_key'] + ' -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"')
-
         commands.append('git remote set-url ' + repo_config['remote'] + " " + repo_config['url'])
         commands.append('git fetch ' + repo_config['remote'])
         commands.append('git checkout -f -B ' + repo_config['branch'] + ' -t ' + repo_config['remote'] + '/' + repo_config['branch'])
         commands.append('git submodule update --init --recursive')
 
+        if "ssh_key" in repo_config:
+            env['GIT_SSH_COMMAND'] = "ssh -i " + repo_config['ssh_key'] + " -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+
         # All commands need to success
         for command in commands:
-            res = ProcessWrapper().call(command, cwd=repo_config['path'], shell=True, supressStderr=True)
+            res = ProcessWrapper().call(command, cwd=repo_config['path'], shell=True, supressStderr=True, env=env)
 
             if res != 0:
                 logger.error("Command '%s' failed with exit code %s" % (command, res))
@@ -97,6 +97,7 @@ class GitWrapper():
             return 0
 
         commands = []
+        env = os.environ.copy()
 
         # On Windows, bash command needs to be run using bash.exe. This assumes bash.exe
         # (typically installed under C:\Program Files\Git\bin) is in the system PATH.
@@ -104,10 +105,6 @@ class GitWrapper():
             commands.append('bash -c "cd \\"' + repo_config['path'] + '\\" && unset GIT_DIR"')
         else:
             commands.append('unset GIT_DIR')
-
-        if "ssh_key" in repo_config:
-            commands.append('unset GIT_SSH_COMMAND')
-            commands.append('export GIT_SSH_COMMAND="ssh -i ' + repo_config['ssh_key'] + ' -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"')
 
         if "prepull" in repo_config:
             commands.append(repo_config['prepull'])
@@ -119,9 +116,12 @@ class GitWrapper():
         if "postpull" in repo_config:
             commands.append(repo_config['postpull'])
 
+        if "ssh_key" in repo_config:
+            env['GIT_SSH_COMMAND'] = "ssh -i " + repo_config['ssh_key'] + " -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+
         # All commands need to success
         for command in commands:
-            res = ProcessWrapper().call(command, cwd=repo_config['path'], shell=True, supressStderr=True)
+            res = ProcessWrapper().call(command, cwd=repo_config['path'], shell=True, supressStderr=True, env=env)
 
             if res != 0:
                 logger.error("Command '%s' failed with exit code %s" % (command, res))
@@ -151,18 +151,18 @@ class GitWrapper():
             return 0
 
         commands = []
+        env = os.environ.copy()
+
         commands.append('unset GIT_DIR')
-
-        if 'ssh_key' in repo_config:
-            commands.append('unset GIT_SSH_COMMAND')
-            commands.append('export GIT_SSH_COMMAND="ssh -i ' + repo_config['ssh_key'] + ' -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"')
-
         commands.append('git clone --recursive ' + repo_config['url'] + ' -b ' + repo_config['branch'] + ' ' + repo_config['path'])
+
+        if "ssh_key" in repo_config:
+            env['GIT_SSH_COMMAND'] = "ssh -i " + repo_config['ssh_key'] + " -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
 
         # All commands need to success
         for command in commands:
 
-            res = ProcessWrapper().call(command, shell=True)
+            res = ProcessWrapper().call(command, shell=True, env=env)
 
             if res != 0:
                 logger.error("Command '%s' failed with exit code %s" % (command, res))
