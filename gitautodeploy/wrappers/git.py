@@ -6,6 +6,35 @@ class GitWrapper():
         pass
 
     @staticmethod
+    def load_ssh_key(repo_config):
+        """Set the GIT_SSH_COMMAND environment variable to use the specified ssh key"""
+        import logging
+        from .process import ProcessWrapper
+        import os
+
+        logger = logging.getLogger()
+        logger.info("Loading SSH key %s" % repo_config['ssh_key'])
+
+        commands = []
+        commands.append('unset GIT_SSH_COMMAND')
+        commands.append('export GIT_SSH_COMMAND="ssh -i ' + repo_config['ssh_key'] + ' -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"')
+
+        # Load the ssh key into the ssh-agent
+        for command in commands:
+            res = ProcessWrapper().call(command, shell=True)
+
+            if res != 0:
+                logger.error("Command '%s' failed with exit code %s" % (command, res))
+                break
+
+        if res == 0:
+            logger.info("SSH key %s successfully loaded" % repo_config['ssh_key'])
+        else:
+            logger.error("Unable to load SSH key %s" % repo_config['ssh_key'])
+
+        return int(res)
+
+    @staticmethod
     def init(repo_config):
         """Init remote url of the repo from the git server"""
         import logging
@@ -29,6 +58,9 @@ class GitWrapper():
         commands.append('git fetch ' + repo_config['remote'])
         commands.append('git checkout -f -B ' + repo_config['branch'] + ' -t ' + repo_config['remote'] + '/' + repo_config['branch'])
         commands.append('git submodule update --init --recursive')
+
+        if "ssh_key" in repo_config:
+            GitWrapper.load_ssh_key(repo_config)
 
         # All commands need to success
         for command in commands:
@@ -80,6 +112,9 @@ class GitWrapper():
         if "postpull" in repo_config:
             commands.append(repo_config['postpull'])
 
+        if "ssh_key" in repo_config:
+            GitWrapper.load_ssh_key(repo_config)
+
         # All commands need to success
         for command in commands:
             res = ProcessWrapper().call(command, cwd=repo_config['path'], shell=True, supressStderr=True)
@@ -110,6 +145,9 @@ class GitWrapper():
         if 'path' not in repo_config:
             logger.info('No local repository path configured, no clone will occure')
             return 0
+        
+        if 'ssh_key' in repo_config:
+            GitWrapper.load_ssh_key(repo_config)
 
         commands = []
         commands.append('unset GIT_DIR')
@@ -117,6 +155,7 @@ class GitWrapper():
 
         # All commands need to success
         for command in commands:
+
             res = ProcessWrapper().call(command, shell=True)
 
             if res != 0:
